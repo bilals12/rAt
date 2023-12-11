@@ -12,32 +12,32 @@ def gf_2_128_mul(x: int, y: int) -> int:
     return res
 
 class InvalidInputException(Exception):
-    """Exception raised for invalid inputs to AES_GCM."""
+    """[!] exception raised for invalid inputs to aes_gcm [!]"""
     def __init__(self, message: str):
         super().__init__(message)
 
 class InvalidTagException(Exception):
-    """Exception raised when the authentication tag is invalid."""
+    """[!] exception raised when the authentication tag is invalid [!]"""
     pass
 
-# Galois/Counter Mode with AES-128 and 96-bit IV
+# galois counter mode with aes-128 and 96-bit IV
 class AES_GCM:
     def __init__(self, master_key: bytes):
         self.change_key(master_key)
 
     def change_key(self, master_key: bytes):
         if len(master_key) * 8 not in (128, 192, 256):
-            raise InvalidInputException('Master key must be 128, 192, or 256 bits.')
+            raise InvalidInputException('master key must be 128, 192, or 256 bits.')
 
         self.__master_key = master_key
         self.__aes_ecb = AES.new(self.__master_key, AES.MODE_ECB)
         self.__auth_key = bytes_to_long(self.__aes_ecb.encrypt(b'\x00' * 16))
 
-        # Precompute the table for multiplication in the finite field
+        # precompute the table for multiplication in the finite field
         self.__pre_table = tuple(tuple(gf_2_128_mul(self.__auth_key, j << (8 * i)) 
                                        for j in range(256)) for i in range(16))
 
-        self.prev_init_value = None  # Reset previous initial value
+        self.prev_init_value = None  # reset previous initial value
 
     def __times_auth_key(self, val: int) -> int:
         res = 0
@@ -46,7 +46,7 @@ class AES_GCM:
             val >>= 8
         return res
 
-    def __ghash(self, aad: bytes, txt: bytes) -> int:
+    def __ghash(self, aad: bytes, txt: bytes) -> int: # compute ghash
         padded_aad = aad + b'\x00' * (-len(aad) % 16)
         padded_txt = txt + b'\x00' * (-len(txt) % 16)
 
@@ -59,10 +59,10 @@ class AES_GCM:
 
     def encrypt(self, init_value: int, plaintext: bytes, auth_data: bytes = b'') -> tuple:
         if init_value >= (1 << 96):
-            raise InvalidInputException('IV should be 96-bit.')
+            raise InvalidInputException('[!] IV should be 96-bit [!]')
 
         if init_value == self.prev_init_value:
-            raise InvalidInputException('IV must not be reused!')
+            raise InvalidInputException('[!] IV must not be reused [!]')
         self.prev_init_value = init_value
 
         padded_plaintext = plaintext + b'\x00' * (-len(plaintext) % 16)
@@ -78,7 +78,7 @@ class AES_GCM:
 
     def decrypt(self, init_value: int, ciphertext: bytes, auth_tag: int, auth_data: bytes = b'') -> bytes:
         if init_value >= (1 << 96) or auth_tag >= (1 << 128):
-            raise InvalidInputException('IV and Tag should be 96-bit and 128-bit respectively.')
+            raise InvalidInputException('[!] IV and tag should be 96-bit and 128-bit respectively []')
 
         computed_tag = self.__ghash(auth_data, ciphertext) ^ bytes_to_long(
             self.__aes_ecb.encrypt(long_to_bytes((init_value << 32) | 1, 16)))
